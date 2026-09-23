@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Bienva",
+    "slug": "bienva-app",
+    "scheme": "bienva",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "cl.bienva.app",
+      "supportsTablet": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-camera", { "cameraPermission": "Para registrar tu comida con una foto", "recordAudioAndroid": false }],
+      ["expo-image-picker", { "photosPermission": "Para elegir una foto de tu comida", "cameraPermission": "Para registrar tu comida con una foto", "microphonePermission": false }],
+      "expo-notifications"
+    ]
+  }
+}

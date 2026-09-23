@@ -1,0 +1,28 @@
+export const es = {
+  brand: 'Bienva',
+  tagline: 'Tu bienestar, a tu ritmo.',
+  auth: {
+    title: 'Qué bueno verte por aquí',
+    description: 'Entra con tu correo y registra a tu ritmo. Sin contraseña.',
+    email: 'Correo electrónico',
+    placeholder: 'tu@correo.cl',
+    send: 'Enviarme el enlace',
+    sending: 'Enviando…',
+    sent: 'Revisa tu correo. Te enviamos un enlace para entrar; si no aparece, revisa spam.',
+    invalidEmail: 'Revisa tu correo e inténtalo de nuevo.',
+    sendError: 'No pudimos enviar el enlace. Revisa tu conexión e inténtalo otra vez.',
+    rateLimit: 'Espera un momento antes de pedir otro enlace.',
+    callbackError: 'No pudimos abrir este enlace. Pide uno nuevo para entrar.',
+    restoringError: 'No pudimos recuperar tu sesión. Cierra y vuelve a abrir la app.',
+    loading: 'Abriendo tu espacio…',
+    back: 'Volver al inicio',
+    signOut: 'Cerrar sesión',
+    signOutError: 'No pudimos cerrar tu sesión. Inténtalo otra vez.',
+    missingConfig: 'Falta configurar la conexión de Bienva. Revisa el archivo .env para continuar.',
+  },
+  today: {
+    title: 'Hoy',
+    welcome: 'Ya estás dentro',
+    pending: 'Tu espacio está listo. Pronto podrás registrar tus comidas aquí.',
+  },
+} as const;
