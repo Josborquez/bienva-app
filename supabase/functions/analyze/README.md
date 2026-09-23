@@ -8,7 +8,7 @@
 ```bash
 supabase login
 supabase link --project-ref <tu-project-ref>      # en Project Settings > General
-supabase secrets set GEMINI_API_KEY=AIza... GEMINI_MODEL=gemini-2.5-flash
+supabase secrets set GEMINI_API_KEY=AIza... GEMINI_MODEL=gemini-3.6-flash
 supabase functions deploy analyze
 ```
 Antes del deploy corre `003_ai_usage_fn.sql` en el SQL Editor.

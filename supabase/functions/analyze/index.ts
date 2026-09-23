@@ -4,7 +4,7 @@
 // los ítems listos para confirmar en la app.
 //
 // Deploy:  supabase functions deploy analyze
-// Secrets: supabase secrets set GEMINI_API_KEY=...  GEMINI_MODEL=gemini-2.5-flash
+// Secrets: supabase secrets set GEMINI_API_KEY=...  GEMINI_MODEL=gemini-3.6-flash
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -79,7 +79,7 @@ const RESPONSE_SCHEMA = {
 // ---------------------------------------------------------------------------
 async function callGemini(req: AnalyzeRequest): Promise<GeminiItem[]> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
-  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
   if (!apiKey) throw new Error("GEMINI_API_KEY no configurada");
 
   const parts: unknown[] = [];

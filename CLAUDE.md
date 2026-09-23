@@ -9,12 +9,12 @@ La gente que intenta registrar lo que come abandona porque acumula días sin reg
 - Proyecto Supabase `app-alimentos` (ref `jbtlwnwrplgbzdsaqvjl`, región us-west-2, Postgres 17) creado y sano.
 - Migraciones 001–004 aplicadas y registradas en el historial remoto: 8 tablas + 2 vistas, RLS, búsqueda difusa, 46 alimentos semilla. `supabase db push` ya es seguro.
 - Migración 004: `increment_ai_usage` y `handle_new_auth_user` solo ejecutables por `service_role`.
-- Edge Function `analyze` escrita, **no desplegada ni probada** todavía.
+- Edge Function `analyze` desplegada (v1) y probada con texto: 200, 3 ítems con `fuente: "base"`. Falta probar con foto.
 - Falta: Edge Function `coach`, cron del resumen semanal, procesamiento de `pending_photos`.
 
 ## Arquitectura
 ```
-App Expo ──JWT──> Edge Functions ──> Gemini 2.5 Flash (foto/voz/texto → JSON)
+App Expo ──JWT──> Edge Functions ──> Gemini 3.6 Flash (foto/voz/texto → JSON)
                         │          └> Claude Haiku 4.5 (coach con memoria)
                         └──> Postgres (foods, meals, user_memory, ai_usage)
 ```
