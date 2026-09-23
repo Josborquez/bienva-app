@@ -1,13 +1,7 @@
-node_modules/
-.expo/
-dist/
-coverage/
+# Raíz del monorepo. Cada área tiene además su propio .gitignore.
+.kilo/
 .env
 .env.*
 !.env.example
-*.tsbuildinfo
-*.log
+node_modules/
 .DS_Store
-/ios/
-/android/
-.kilo/
