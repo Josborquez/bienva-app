@@ -7,8 +7,8 @@ La gente que intenta registrar lo que come abandona porque acumula días sin reg
 
 ## Estado actual (23 sep 2026)
 - Proyecto Supabase `app-alimentos` (ref `jbtlwnwrplgbzdsaqvjl`, región us-west-2, Postgres 17) creado y sano.
-- Migraciones 001–003 aplicadas a mano desde el SQL Editor: 8 tablas + 2 vistas, RLS, búsqueda difusa, 46 alimentos semilla. El historial remoto solo registra `20260923135855_ai_usage_increment_fn`; reparar con `supabase migration repair` antes de `db push`.
-- Migración 004 (revoca EXECUTE de `increment_ai_usage` y `handle_new_auth_user` a anon/authenticated) escrita, pendiente de aplicar.
+- Migraciones 001–004 aplicadas y registradas en el historial remoto: 8 tablas + 2 vistas, RLS, búsqueda difusa, 46 alimentos semilla. `supabase db push` ya es seguro.
+- Migración 004: `increment_ai_usage` y `handle_new_auth_user` solo ejecutables por `service_role`.
 - Edge Function `analyze` escrita, **no desplegada ni probada** todavía.
 - Falta: Edge Function `coach`, cron del resumen semanal, procesamiento de `pending_photos`.
 
