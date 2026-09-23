@@ -1,6 +1,6 @@
-# bienva-backend
+# bienva-app · backend
 
-Backend de **Bienva** (bienva.cl): app iPhone de nutrición simple con IA para Chile. Tagline: *Tu bienestar, a tu ritmo.* Todo vive en Supabase: Postgres, Auth, Storage y Edge Functions. La app móvil está en otro repo (`bienva-app`, Expo).
+Backend de **Bienva** (bienva.cl): app iPhone de nutrición simple con IA para Chile. Tagline: *Tu bienestar, a tu ritmo.* Todo vive en Supabase: Postgres, Auth, Storage y Edge Functions. La app móvil (Expo) vive en `../frontend` de este mismo repo.
 
 ## Problema que resuelve
 La gente que intenta registrar lo que come abandona porque acumula días sin registrar y ponerse al día se siente como castigo. La app hace que registrar tome menos de 15 s y que un día perdido se recupere en vez de romper una racha.
@@ -47,6 +47,7 @@ Extensiones van en el esquema `extensions`; toda función que use `unaccent`/`si
 
 ## Comandos
 ```bash
+cd backend                           # todos los comandos de Supabase se corren desde aquí
 supabase login
 supabase link --project-ref jbtlwnwrplgbzdsaqvjl
 supabase db push                    # aplica migraciones pendientes

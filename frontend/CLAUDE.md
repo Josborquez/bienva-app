@@ -1,6 +1,6 @@
-# bienva-app
+# bienva-app · frontend
 
-**Bienva: nutrición simple** (bienva.cl). App iPhone (Expo + React Native + TypeScript) de registro nutricional con IA para Chile. Tagline: *Tu bienestar, a tu ritmo.* El backend es Supabase y vive en el repo `bienva-backend`; este repo solo consume sus tablas y Edge Functions.
+**Bienva: nutrición simple** (bienva.cl). App iPhone (Expo + React Native + TypeScript) de registro nutricional con IA para Chile. Tagline: *Tu bienestar, a tu ritmo.* El backend es Supabase y vive en `../backend` de este mismo repo; `frontend/` solo consume sus tablas y Edge Functions por la API, nunca importa código de `backend/`.
 
 ## Problema que resuelve
 La gente abandona el registro de comidas porque acumula días sin anotar y ponerse al día se siente como castigo. Esta app hace que registrar tome menos de 15 s y que un día perdido se recupere, no que rompa una racha.
@@ -9,7 +9,7 @@ La gente abandona el registro de comidas porque acumula días sin anotar y poner
 El usuario registra al menos 5 de 7 días durante 2 semanas seguidas usando solo la app.
 
 ## Estado actual (23 sep 2026)
-Repo vacío. Backend listo con tablas y 46 alimentos; Edge Function `analyze` escrita, pendiente de deploy.
+Estructura y P1 Login implementados (pendiente de validar en iPhone); P2–P8 por hacer. Backend: migraciones 001–004 aplicadas, `analyze` desplegada y probada con texto.
 
 ## Stack y setup
 - Expo SDK actual, TypeScript, `expo-router`, `@supabase/supabase-js`, `expo-camera`, `expo-image-manipulator`, `expo-notifications`, `expo-av` (voz, después).

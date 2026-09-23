@@ -1,6 +1,6 @@
 # Bienva app — Especificación de desarrollo (SDD)
 
-Documento de diseño de software para el repo `bienva-app`. Complementa `CLAUDE.md` (contexto y reglas) con el **qué construir, en qué orden y cómo saber que está listo**. Claude Code debe leer ambos antes de empezar.
+Documento de diseño de software para el área `frontend/` del repo `bienva-app`. Complementa `CLAUDE.md` (contexto y reglas) con el **qué construir, en qué orden y cómo saber que está listo**. Claude Code debe leer ambos antes de empezar.
 
 ---
 
@@ -19,7 +19,7 @@ Documento de diseño de software para el repo `bienva-app`. Complementa `CLAUDE.
 ## 1. Estructura del proyecto
 
 ```
-bienva-app/
+bienva-app/frontend/
 ├─ app/                        # expo-router
 │  ├─ _layout.tsx              # providers: QueryClient, Supabase session, theme
 │  ├─ (auth)/login.tsx
