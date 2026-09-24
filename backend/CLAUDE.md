@@ -54,7 +54,11 @@ supabase link --project-ref jbtlwnwrplgbzdsaqvjl
 supabase db push                    # aplica migraciones pendientes
 supabase functions deploy analyze
 supabase functions logs analyze
+
+# Borrador de migración para foods desde etiquetas de Jumbo / Santa Isabel (no escribe en la base)
+npx deno run --allow-net=www.jumbo.cl,www.santaisabel.cl tools/etiquetas.ts buscar "yoghurt protein" --extraer --max 3
 ```
+`tools/etiquetas.ts` respeta robots.txt (Líder prohíbe fichas y Unimarc bloquea bots: no se usan), va de a una petición cada 2 s y se identifica como `BienvaEtiquetas`. El SQL que imprime se revisa (nombre, categoría, aliases, que no le gane búsquedas genéricas) antes de copiarlo a una migración.
 
 ## Backlog inmediato (en orden)
 1. Desplegar y probar `analyze` con texto y con foto. Ajustar el prompt si Gemini devuelve nombres no chilenos.
