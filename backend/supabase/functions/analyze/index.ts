@@ -190,8 +190,10 @@ Deno.serve(async (req) => {
     // 5. Cruce con foods
     const items = await matchWithFoods(admin, raw);
 
-    // 6. Contador de uso
-    const hoy = body.fecha ?? new Date().toISOString().slice(0, 10);
+    // 6. Contador de uso: siempre la fecha del servidor (UTC, igual que el
+    // current_date de can_analyze_photo). body.fecha es del cliente; si se
+    // usara aquí, una foto "de ayer" no sumaría al tope de hoy.
+    const hoy = new Date().toISOString().slice(0, 10);
     if (body.image_base64) {
       await admin.rpc("increment_ai_usage", { p_user: user.id, p_fecha: hoy, p_fotos: 1, p_mensajes: 0 });
     }
