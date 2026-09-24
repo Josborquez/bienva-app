@@ -64,7 +64,7 @@ Sin librerías de UI pesadas. Componentes propios sobre `StyleSheet`.
 Tipos generados desde Supabase con `supabase gen types typescript --project-id jbtlwnwrplgbzdsaqvjl > src/types/database.ts`. Tipos de dominio encima:
 
 ```ts
-type MealType = 'desayuno' | 'almuerzo' | 'snack' | 'cena';
+type MealType = 'desayuno' | 'almuerzo' | 'snack' | 'once' | 'cena';
 
 interface MealItemDraft {
   nombre: string;

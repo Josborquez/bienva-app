@@ -42,7 +42,7 @@ Extensiones van en el esquema `extensions`; toda función que use `unaccent`/`si
 ## Convenciones
 - Migraciones en `supabase/migrations/YYYYMMDDHHMMSS_nombre.sql`. Nunca editar una aplicada; crear una nueva.
 - Edge Functions en Deno/TypeScript, una carpeta por función, `Deno.serve`, CORS incluido, respuestas JSON `{ error }` con status correcto.
-- Nombres de columnas y enums en español (`desayuno`, `almuerzo`, `snack`, `cena`).
+- Nombres de columnas y enums en español (`desayuno`, `almuerzo`, `snack`, `once`, `cena`).
 - Secrets: `supabase secrets set`. Nunca en el repo. Ver `.env.example`.
 - Antes de desplegar una función, probarla con `curl` según `supabase/functions/analyze/README.md`.
 

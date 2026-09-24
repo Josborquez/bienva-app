@@ -507,7 +507,7 @@ export type Database = {
     Enums: {
       chat_role: "user" | "assistant"
       meal_origin: "foto" | "texto" | "voz" | "repetir" | "manual"
-      meal_type: "desayuno" | "almuerzo" | "snack" | "cena"
+      meal_type: "desayuno" | "almuerzo" | "snack" | "once" | "cena"
       plan_type: "free" | "pro"
     }
     CompositeTypes: {
@@ -641,7 +641,7 @@ export const Constants = {
     Enums: {
       chat_role: ["user", "assistant"],
       meal_origin: ["foto", "texto", "voz", "repetir", "manual"],
-      meal_type: ["desayuno", "almuerzo", "snack", "cena"],
+      meal_type: ["desayuno", "almuerzo", "snack", "once", "cena"],
       plan_type: ["free", "pro"],
     },
   },

@@ -15,7 +15,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // ---------------------------------------------------------------------------
 // Tipos
 // ---------------------------------------------------------------------------
-type MealType = "desayuno" | "almuerzo" | "snack" | "cena";
+const MEAL_TYPES = ["desayuno", "almuerzo", "snack", "once", "cena"] as const; // = enum meal_type
+type MealType = (typeof MEAL_TYPES)[number];
 
 interface AnalyzeRequest {
   image_base64?: string;      // JPEG/PNG ya redimensionado a ≤1024 px
@@ -266,6 +267,9 @@ Deno.serve(async (req) => {
 
     const body = (await req.json()) as AnalyzeRequest;
     if (!body.image_base64 && !body.text) return json({ error: "Falta image_base64 o text" }, 400);
+    if (body.meal_type && !MEAL_TYPES.includes(body.meal_type)) {
+      return json({ error: `meal_type inválido; usa ${MEAL_TYPES.join(", ")}` }, 400);
+    }
 
     // 3. Tope del plan free (solo para fotos; el texto es gratis)
     if (body.image_base64) {

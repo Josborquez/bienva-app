@@ -1,4 +1,4 @@
-export type MealType = 'desayuno' | 'almuerzo' | 'snack' | 'cena';
+export type MealType = 'desayuno' | 'almuerzo' | 'snack' | 'once' | 'cena';
 
 export interface MealItemDraft {
   nombre: string;
