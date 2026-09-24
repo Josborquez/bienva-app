@@ -3,3 +3,6 @@
 !.env.example
 supabase/.temp
 node_modules
+
+# caché local de tools/openfoodfacts.py
+tools/.cache/
