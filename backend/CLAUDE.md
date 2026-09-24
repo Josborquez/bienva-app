@@ -15,6 +15,7 @@ La gente que intenta registrar lo que come abandona porque acumula días sin reg
 ## Arquitectura
 ```
 App Expo ──JWT──> Edge Functions ──> Gemini 3.6 Flash (foto/voz/texto → JSON)
+                        │          ├> Claude Haiku 4.5 (respaldo de analyze si Gemini da 429/5xx)
                         │          └> Claude Haiku 4.5 (coach con memoria)
                         └──> Postgres (foods, meals, user_memory, ai_usage)
 ```
@@ -22,7 +23,7 @@ Reglas de diseño que no se negocian:
 1. La app nunca llama a Gemini ni a Anthropic directo. Solo Edge Functions, con `service_role` en secrets.
 2. La IA identifica alimento y porción; **las calorías salen de la tabla `foods`** cuando hay match. El modelo solo rellena cuando no hay match (`fuente: "modelo"`).
 3. El coach no recibe historial completo: recibe `user_memory.perfil_texto` (≤500 tokens) + resumen del día + últimos 20 mensajes. Tras cada conversación, otra llamada reescribe el perfil.
-4. Toda llamada con foto pasa por `can_analyze_photo()` y suma en `ai_usage` con `increment_ai_usage()`. Texto no cuenta.
+4. Toda llamada con foto pasa por `can_analyze_photo()` y suma en `ai_usage` con `increment_ai_usage()`, siempre con la fecha del servidor (UTC, nunca la `fecha` del cliente). Texto no cuenta.
 5. Un día sin filas en `daily_totals` es "sin registro", nunca 0.
 
 ## Esquema (resumen)

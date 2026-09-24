@@ -3,9 +3,13 @@
 // alimentos y porciones, cruza cada ítem contra la tabla foods y devuelve
 // los ítems listos para confirmar en la app.
 //
+// Si Gemini no está disponible (429/5xx o red), reintenta con Claude Haiku 4.5.
+//
 // Deploy:  supabase functions deploy analyze
 // Secrets: supabase secrets set GEMINI_API_KEY=...  GEMINI_MODEL=gemini-3.6-flash
+//          supabase secrets set ANTHROPIC_API_KEY=...   (respaldo; opcional)
 
+import Anthropic from "npm:@anthropic-ai/sdk@0.128";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 // ---------------------------------------------------------------------------
@@ -103,17 +107,99 @@ async function callGemini(req: AnalyzeRequest): Promise<GeminiItem[]> {
     },
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new ModelUnavailableError(`Gemini red: ${e}`);
+  }
+  if (res.status === 429 || res.status >= 500) {
+    throw new ModelUnavailableError(`Gemini ${res.status}: ${await res.text()}`);
+  }
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
 
   const data = await res.json();
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
   const parsed = JSON.parse(raw);
   return Array.isArray(parsed.items) ? parsed.items : [];
+}
+
+// Gemini caído o saturado: vale la pena probar otro modelo.
+class ModelUnavailableError extends Error {}
+
+// ---------------------------------------------------------------------------
+// Respaldo: Claude Haiku 4.5 (mismo prompt, mismo esquema)
+// ---------------------------------------------------------------------------
+const HAIKU_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          nombre:     { type: "string" },
+          cantidad:   { type: "number" },
+          cantidad_g: { anyOf: [{ type: "number" }, { type: "null" }] },
+          kcal:       { type: "number" },
+          prot_g:     { type: "number" },
+          confianza:  { type: "number" },
+        },
+        required: ["nombre", "cantidad", "cantidad_g", "kcal", "prot_g", "confianza"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["items"],
+  additionalProperties: false,
+};
+
+type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+async function callHaiku(req: AnalyzeRequest): Promise<GeminiItem[]> {
+  const client = new Anthropic({ timeout: 60_000 }); // lee ANTHROPIC_API_KEY
+
+  const content: Anthropic.ContentBlockParam[] = [];
+  if (req.image_base64) {
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: (req.mime_type ?? "image/jpeg") as ImageMediaType, data: req.image_base64 },
+    });
+  }
+  content.push({
+    type: "text",
+    text: req.text
+      ? `Comida descrita por el usuario (${req.meal_type ?? "sin tipo"}): ${req.text}`
+      : `Foto de ${req.meal_type ?? "una comida"}. Identifica todo lo que se ve.`,
+  });
+
+  const msg = await client.messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 16000,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content }],
+    output_config: { format: { type: "json_schema", schema: HAIKU_SCHEMA } },
+  });
+  if (msg.stop_reason !== "end_turn") throw new Error(`Haiku stop_reason: ${msg.stop_reason}`);
+
+  const block = msg.content.find((b) => b.type === "text");
+  const parsed = JSON.parse(block?.type === "text" ? block.text : "{}");
+  return Array.isArray(parsed.items) ? parsed.items : [];
+}
+
+// Gemini primero; si no está disponible y hay clave de Anthropic, Haiku.
+async function identifyItems(req: AnalyzeRequest): Promise<{ items: GeminiItem[]; modelo: string }> {
+  try {
+    return { items: await callGemini(req), modelo: "gemini" };
+  } catch (e) {
+    if (!(e instanceof ModelUnavailableError) || !Deno.env.get("ANTHROPIC_API_KEY")) throw e;
+    console.warn(`Gemini no disponible, uso Haiku: ${e.message.slice(0, 200)}`);
+    return { items: await callHaiku(req), modelo: "haiku" };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -183,9 +269,10 @@ Deno.serve(async (req) => {
       if (!ok) return json({ error: "limite_fotos", message: "Llegaste al tope de fotos de hoy" }, 429);
     }
 
-    // 4. Gemini → ítems
+    // 4. Gemini (o Haiku de respaldo) → ítems
     const t0 = Date.now();
-    const raw = await callGemini(body);
+    const { items: raw, modelo } = await identifyItems(body);
+    console.log(`analyze modelo=${modelo} items=${raw.length}`);
 
     // 5. Cruce con foods
     const items = await matchWithFoods(admin, raw);
@@ -209,7 +296,10 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error(e);
-    return json({ error: String(e?.message ?? e) }, 500);
+    if (e instanceof ModelUnavailableError) {
+      return json({ error: "ia_no_disponible", message: "La IA está saturada, intenta en un rato" }, 503);
+    }
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });
 

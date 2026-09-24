@@ -9,6 +9,7 @@
 supabase login
 supabase link --project-ref <tu-project-ref>      # en Project Settings > General
 supabase secrets set GEMINI_API_KEY=AIza... GEMINI_MODEL=gemini-3.6-flash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   # respaldo con Claude Haiku 4.5 (opcional)
 supabase functions deploy analyze
 ```
 Antes del deploy corre `003_ai_usage_fn.sql` en el SQL Editor.
@@ -33,6 +34,9 @@ curl -X POST 'https://<ref>.supabase.co/functions/v1/analyze' \
   -H 'Authorization: Bearer <ACCESS_TOKEN>' -H 'Content-Type: application/json' \
   -d "{\"image_base64\":\"$B64\",\"mime_type\":\"image/jpeg\",\"meal_type\":\"almuerzo\"}"
 ```
+
+## Respaldo con Haiku
+Si Gemini responde 429, 5xx o falla la red, `analyze` repite la llamada con Claude Haiku 4.5 (mismo prompt y esquema). Sin `ANTHROPIC_API_KEY`, o si el respaldo tampoco responde, devuelve `503 {"error":"ia_no_disponible"}`. El log dice `analyze modelo=gemini|haiku`.
 
 ## Respuesta
 ```json
