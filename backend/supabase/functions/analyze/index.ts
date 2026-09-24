@@ -192,14 +192,18 @@ async function callHaiku(req: AnalyzeRequest): Promise<GeminiItem[]> {
 }
 
 // Gemini primero; si no está disponible y hay clave de Anthropic, Haiku.
+// TEMPORAL (24 sep 2026): Gemini desactivado mientras su cuota está agotada
+// (429 "exceeded your current quota"); todo va directo a Haiku. Para volver,
+// descomentar el bloque y borrar el return de abajo.
 async function identifyItems(req: AnalyzeRequest): Promise<{ items: GeminiItem[]; modelo: string }> {
-  try {
-    return { items: await callGemini(req), modelo: "gemini" };
-  } catch (e) {
-    if (!(e instanceof ModelUnavailableError) || !Deno.env.get("ANTHROPIC_API_KEY")) throw e;
-    console.warn(`Gemini no disponible, uso Haiku: ${e.message.slice(0, 200)}`);
-    return { items: await callHaiku(req), modelo: "haiku" };
-  }
+  // try {
+  //   return { items: await callGemini(req), modelo: "gemini" };
+  // } catch (e) {
+  //   if (!(e instanceof ModelUnavailableError) || !Deno.env.get("ANTHROPIC_API_KEY")) throw e;
+  //   console.warn(`Gemini no disponible, uso Haiku: ${e.message.slice(0, 200)}`);
+  //   return { items: await callHaiku(req), modelo: "haiku" };
+  // }
+  return { items: await callHaiku(req), modelo: "haiku" };
 }
 
 // ---------------------------------------------------------------------------
