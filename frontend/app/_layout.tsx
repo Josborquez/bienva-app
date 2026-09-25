@@ -7,10 +7,12 @@ import { SessionProvider, useSession } from '../src/hooks/useSession';
 import { LoadingScreen } from '../src/components/LoadingScreen';
 import { theme } from '../src/theme';
 import { useProfile } from '../src/hooks/useProfile';
+import { usePendingUploadSync } from '../src/hooks/usePendingUploadSync';
 
 function Routes() {
   const { session, loading } = useSession();
   const profile = useProfile(session?.user.id ?? '');
+  usePendingUploadSync(session?.user.id ?? '');
   if (loading) return <LoadingScreen />;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>

@@ -4,6 +4,16 @@ Nutrición simple. Tu bienestar, a tu ritmo.
 
 ## Estado
 
+### Registro por foto
+
+Registrar incluye Foto con cámara (`expo-camera`) y galería (`expo-image-picker`), miniatura, «Cambiar foto» y análisis JPEG con `analyzeImage`. Se reduce a máximo 1024 px por lado y calidad 0,8. Conserva `food_id` y `fuente` en los ítems que pasan al editor existente y guarda con origen `foto`. Los errores 429 `limite_fotos`, 413 y respuesta sin ítems tienen banners neutros; sin ítems se ofrece «Registrar por texto». Al negar la cámara, vuelve al selector con «Sin permiso de cámara; puedes elegir de la galería». Durante el análisis se muestra «Mirando tu plato…» con los botones deshabilitados. Frecuentes y Texto mantienen sus recorridos. La selección de foto sin analizar se mantiene durante la pantalla; los ítems analizados sí se guardan como borrador. Tests de análisis en `tests/analyze.test.ts`.
+
+Hoy incluye Foto rápida: captura sin confirmación, guarda el JPEG en caché y registra la cola por usuario en AsyncStorage (`pendingUploads:<uid>`). Sube bytes a `meal-photos/<uid>/<uuid>.jpg` e inserta `pending_photos` con el mismo ID en los reintentos; nunca reinicia `procesada`. La cola se intenta al iniciar sesión, abrir la app, volver al primer plano y manualmente desde Hoy. En web las imágenes en cola están en IndexedDB; en el teléfono, en la caché de Expo. La caché del sistema puede eliminarse por falta de espacio; un fallo conserva el registro de la cola y permite subir las demás fotos.
+
+El banner de pendientes llama a `process_pending({limit:5})`, consulta los cambios reales de las filas para mostrar progreso e invalida pendientes, comidas y borradores al terminar. Distingue límite diario, interrupción y errores parciales. El backend local contiene el contrato `{processed, created_meals, errors, stopped?}`; su publicación remota requiere validación autenticada.
+
+Verificación de fotos: TypeScript y 40 pruebas aprobadas; exportación web/iOS generada. Incluye horarios límite, rutas de Storage, tamaño de imagen, 429/413/sin ítems y reintento después de fallo parcial de subida. **Pendiente en Expo Go:** foto de plato real con al menos un ítem `fuente: base`, fila real en `pending_photos`, modo avión → reabrir con conexión, lote → Para retomar, y medir menos de 3 segundos tras el disparo. No hay iPhone/Expo Go conectado a este entorno; las pruebas con respuestas simuladas no certifican esos criterios ni la latencia de red.
+
 Login con correo y contraseña, creación de cuenta, recuperación de clave y magic link alternativo implementados según `../docs/SPEC (1).md`. El acceso por enlace web se comprobó; el recorrido real con contraseña y la persistencia al reabrir Chrome siguen pendientes de confirmación. P1 nativa aún no se ha validado en iPhone.
 
 ### Acceso con contraseña
@@ -28,7 +38,7 @@ Hoy lee las metas y comidas reales del usuario. Registrar abre Frecuentes por de
 
 Los borradores, incluidas las selecciones de alimentos y cantidades, se guardan localmente por usuario con AsyncStorage durante la edición. Los ítems se sincronizan con Supabase después del análisis, al agregar la selección para revisarla o al pulsar «Guardar borrador y volver». Las selecciones aún no agregadas quedan en este dispositivo. Los identificadores estables permiten reintentar sin duplicar comidas; solo se incluyen en los totales al terminar de guardar todos los ítems.
 
-Pendientes: validar el recorrido completo contra Supabase desde la web/iPhone, edición de comidas ya guardadas, fotos, reconstrucción, Semana, Coach y Ajustes. P2–P4 no se consideran aceptadas todavía. Se avanza por autorización del usuario sin bloquear el desarrollo por las pruebas de magic links.
+Pendientes: validar el recorrido completo (incluidas fotos) contra Supabase desde la web/iPhone, edición de comidas ya guardadas, reconstrucción por días, Semana, Coach y Ajustes. P2–P4 no se consideran aceptadas todavía. Se avanza por autorización del usuario sin bloquear el desarrollo por las pruebas de magic links.
 Leer `CLAUDE.md` y `SPEC.md` antes de continuar.
 
 ### Comprobar el recorrido de comidas
@@ -106,7 +116,7 @@ Esta prueba aún no se ha realizado. No marcar P1 como aceptada por pasar solo l
 Los tests cubren enlaces nativos/Expo Go, rechazo de callbacks inválidos y persistencia fragmentada
 en SecureStore, incluyendo escrituras fallidas y cierre de sesión. No sustituyen Supabase ni el iPhone.
 
-Verificado localmente: TypeScript sin errores, 28 tests aprobados y bundles web/iOS generados.
+Verificado localmente: TypeScript sin errores, 40 tests aprobados y bundles web/iOS generados.
 Las pruebas incluyen fechas por zona horaria, metas, validación de respuestas de IA y reintentos de guardado con fallos simulados; no sustituyen el recorrido real autenticado.
 `npm audit` reporta 21 avisos (9 altos y 12 moderados) en el árbol
 de dependencias de SDK 54. Las correcciones propuestas incluyen cambios mayores de Expo;

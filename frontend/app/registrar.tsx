@@ -9,7 +9,10 @@ import { MealItemEditor } from '../src/components/MealItemEditor';
 import { FoodPicker } from '../src/components/FoodPicker';
 import { selectionItem } from '../src/utils/foodSelection';
 import { useSession } from '../src/hooks/useSession';
-import { analyzeText } from '../src/api/analyze';
+import { analyzeText, analyzeImage } from '../src/api/analyze';
+import { PhotoInput } from '../src/components/PhotoInput';
+import type { ImageResult } from 'expo-image-manipulator';
+import { PhotoAnalysisError } from '../src/utils/photos';
 import { draftRows, loadMealDraft, saveMealDraft } from '../src/api/meals';
 import { readLocalDrafts, writeLocalDraft } from '../src/api/localDrafts';
 import { dayKey, mealTypes, parseAmount, suggestedMeal, sumNutrition, validDay } from '../src/utils/nutrition';
@@ -34,6 +37,9 @@ export default function RegisterMeal() {
   const [loadError, setLoadError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [syncPending, setSyncPending] = useState(false);
+  const [photo, setPhoto] = useState<ImageResult | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoEmpty, setPhotoEmpty] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -108,6 +114,24 @@ export default function RegisterMeal() {
     } catch { setError(es.register.saveError); }
     finally { end(); }
   }
+  async function analyzePhoto(base64: string) {
+    const current = draftRef.current;
+    if (!current || !begin()) return;
+    setPhotoError(null);
+    setPhotoEmpty(false);
+    try {
+      if (!validDay(current.fecha)) { setError(es.register.invalid); return; }
+      const items = await analyzeImage(base64, current.tipo, current.fecha);
+      const next: MealDraft = { ...current, origin: 'foto', selections: [], items: items.map(item => ({
+        ...item, id: randomUUID(), cantidad: String(item.cantidad), kcal: String(item.kcal), prot_g: String(item.prot_g),
+        cantidad_g: item.cantidad_g ?? null, food_id: item.food_id ?? null, fuente: item.fuente === 'base' ? 'base' : 'modelo', edited: false, confirmed: false,
+      })) };
+      await persist(next);
+      try { await saveMealDraft(userId, next); setSyncPending(false); await invalidate(); }
+      catch { setSyncPending(true); }
+    } catch (failure) { setPhotoEmpty(failure instanceof PhotoAnalysisError && failure.code === 'empty'); setPhotoError(es.photos[failure instanceof PhotoAnalysisError ? failure.code : 'failed']); }
+    finally { end(); }
+  }
   async function addSelected() {
     const current = draftRef.current;
     if (!current || !begin()) return;
@@ -130,15 +154,15 @@ export default function RegisterMeal() {
   return <Screen top>
     <Text style={styles.brand}>{es.brand}</Text>
     <Text accessibilityRole="header" style={styles.title}>{draft.items.length ? es.register.review : es.register.title}</Text>
-    <Text style={styles.muted}>{draft.items.length ? es.register.reviewHint : entryMode === 'frecuentes' ? es.foods.description : es.register.description}</Text>
+    <Text style={styles.muted}>{draft.items.length ? es.register.reviewHint : entryMode === 'frecuentes' ? es.foods.description : entryMode === 'foto' ? es.photos.description : es.register.description}</Text>
     <Text style={styles.label}>{es.register.type}</Text>
     <View style={styles.types}>{mealTypes.map(type => <Pressable accessibilityRole="radio" accessibilityState={{ checked: draft.tipo === type, disabled: busy }} disabled={busy} key={type} onPress={() => edit({ tipo: type })} style={[styles.type, draft.tipo === type && styles.selected]}><Text style={[styles.typeLabel, draft.tipo === type && { color: theme.colors.surface }]}>{es.mealTypes[type]}</Text></Pressable>)}</View>
     <View style={styles.field}><Text style={styles.label}>{es.register.date}</Text><TextInput accessibilityLabel={es.register.date} placeholder={es.register.dateHint} value={draft.fecha} editable={!busy} onChangeText={fecha => edit({ fecha })} style={styles.input} /></View>
     {!draft.items.length ? <>
       <View style={styles.types} accessibilityRole="tablist">
-        {(['frecuentes', 'texto'] as const).map(mode => <Pressable key={mode} accessibilityRole="tab" accessibilityState={{ selected: entryMode === mode, disabled: busy }} disabled={busy} onPress={() => { edit({ entryMode: mode }); setError(null); }} style={[styles.type, entryMode === mode && styles.selected]}><Text style={[styles.typeLabel, entryMode === mode && { color: theme.colors.surface }]}>{mode === 'frecuentes' ? es.foods.tab : es.foods.textTab}</Text></Pressable>)}
+        {(['frecuentes', 'texto', 'foto'] as const).map(mode => <Pressable key={mode} accessibilityRole="tab" accessibilityState={{ selected: entryMode === mode, disabled: busy }} disabled={busy} onPress={() => { edit({ entryMode: mode }); setError(null); setPhotoError(null); }} style={[styles.type, entryMode === mode && styles.selected]}><Text style={[styles.typeLabel, entryMode === mode && { color: theme.colors.surface }]}>{mode === 'frecuentes' ? es.foods.tab : mode === 'foto' ? es.photos.tab : es.foods.textTab}</Text></Pressable>)}
       </View>
-      {entryMode === 'frecuentes' ? <FoodPicker userId={userId} type={draft.tipo} selections={draft.selections ?? []} disabled={busy} onChange={selections => edit({ selections })} onAdd={addSelected} /> : <>
+      {entryMode === 'frecuentes' ? <FoodPicker userId={userId} type={draft.tipo} selections={draft.selections ?? []} disabled={busy} onChange={selections => edit({ selections })} onAdd={addSelected} /> : entryMode === 'foto' ? <PhotoInput photo={photo} onPhoto={value => { setPhoto(value); setPhotoError(null); }} busy={busy} onAnalyze={base64 => { void analyzePhoto(base64); }} /> : <>
       <View style={styles.field}><Text style={styles.label}>{es.register.text}</Text><TextInput accessibilityLabel={es.register.text} placeholder={es.register.placeholder} placeholderTextColor={theme.colors.muted} value={draft.text} multiline maxLength={4000} editable={!busy} onChangeText={text => edit({ text })} style={[styles.input, styles.textarea]} /></View>
       <Button title={busy ? es.register.analyzing : es.register.analyze} busy={busy} onPress={analyze} />
       </>}
@@ -149,6 +173,9 @@ export default function RegisterMeal() {
       <Button title={busy ? es.register.saving : es.register.save} busy={busy} onPress={() => finish(true)} />
     </>}
     {error && <Text accessibilityRole="alert" style={styles.warning}>{error}</Text>}
+    {photoError && <View style={styles.photoNotice}><Text accessibilityRole="alert" style={styles.muted}>{photoError}</Text>
+      {photoEmpty && <Button title={es.photos.useText} secondary disabled={busy} onPress={() => { edit({ entryMode: 'texto' }); setPhotoError(null); setPhotoEmpty(false); }} />}
+    </View>}
     {localError && <Text accessibilityRole="alert" style={styles.warning}>{es.register.localError}</Text>}
     {syncPending && <Text style={styles.warning}>{es.register.syncPending}</Text>}
     <Button secondary title={es.register.later} disabled={busy} onPress={() => finish(false)} />
@@ -170,5 +197,6 @@ const styles = StyleSheet.create({
   total: { padding: 20, borderRadius: 20, backgroundColor: theme.colors.primarySoft, gap: 8 },
   totalValue: { fontSize: 22, fontWeight: '600', color: theme.colors.primary },
   warning: { color: theme.colors.amber, fontSize: 15, lineHeight: 22 },
+  photoNotice: { padding: 16, gap: 12, borderRadius: 16, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
   small: { color: theme.colors.muted, textAlign: 'center', fontSize: 13 },
 });

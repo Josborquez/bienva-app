@@ -6,6 +6,7 @@ import { Screen } from '../../src/components/Screen';
 import { Button } from '../../src/components/Button';
 import { NutrientCard } from '../../src/components/NutrientCard';
 import { DraftRow } from '../../src/components/DraftRow';
+import { TodayPhotos } from '../../src/components/TodayPhotos';
 import { signOut } from '../../src/api/auth';
 import { deleteMealDraft } from '../../src/api/meals';
 import { useSession } from '../../src/hooks/useSession';
@@ -53,6 +54,7 @@ export default function Today() {
           <NutrientCard title={es.today.protein} unit={es.today.grams} value={totals?.prot_g ?? null} min={profile?.meta_prot_min ?? null} max={profile?.meta_prot_max ?? null} />
         </View>
         <Button title={es.today.register} onPress={() => openDraft(randomUUID(), true)} />
+        <TodayPhotos userId={session.user.id} />
         <View style={styles.sectionHeading}><Text accessibilityRole="header" style={styles.section}>{es.today.meals}</Text><Pressable accessibilityRole="button" onPress={today.refresh}><Text style={styles.link}>{es.today.refresh}</Text></Pressable></View>
         {!meals.length ? <View style={styles.empty}><Text style={styles.emptyMark}>＋</Text><Text style={styles.section}>{es.today.empty}</Text><Text style={styles.muted}>{es.today.emptyHint}</Text></View> : <>
           <Text style={styles.muted}>{es.today.mealCount(meals.length)}</Text>

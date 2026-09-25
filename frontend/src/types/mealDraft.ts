@@ -22,6 +22,6 @@ export interface MealDraft {
   text: string;
   items: EditableItem[];
   origin?: Enums<'meal_origin'>;
-  entryMode?: 'frecuentes' | 'texto';
+  entryMode?: 'frecuentes' | 'texto' | 'foto';
   selections?: FoodSelection[];
 }

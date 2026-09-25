@@ -11,9 +11,11 @@ El usuario registra al menos 5 de 7 días durante 2 semanas seguidas usando solo
 ## Estado actual (25 sep 2026)
 
 P1 ampliada según `../docs/SPEC (1).md`: correo/contraseña, crear cuenta, recuperar clave y enlace alternativo. Usuarios conectados pueden definir contraseña desde Hoy. La recuperación vuelve al callback existente y abre `/auth/password`; falta validar con una cuenta real. P1b implementada en `/bienvenida`: siete pasos con borrador por usuario, previsualización por `compute_targets`, «Empezar» guarda por `complete_onboarding` y habilita Hoy. Permiso de notificaciones opcional al finalizar; programación de avisos pendiente de P8. Validación alineada con migraciones 004/005, pruebas autenticadas y visuales en iPhone pendientes.
-Login implementado; acceso web comprobado, persistencia al reabrir Chrome e iPhone pendientes. Recorrido Hoy → Registrar (Frecuentes/buscador por defecto o Texto) → revisar/editar → guardar implementado, pendiente de validación real. Selección múltiple y porciones proporcionales sin IA para alimentos de la base/frecuentes. Borradores locales por usuario y sincronización con Supabase. Fotos, edición posterior, reconstrucción y P6–P8 pendientes. Backend a cargo de Claude Code.
+Login implementado; acceso web comprobado, persistencia al reabrir Chrome e iPhone pendientes. Recorrido Hoy → Registrar (Frecuentes/buscador por defecto, Texto o Foto) → revisar/editar → guardar implementado, pendiente de validación real. Selección múltiple y porciones proporcionales sin IA para alimentos de la base/frecuentes. Borradores locales por usuario y sincronización con Supabase. Edición posterior, reconstrucción por días y P6–P8 pendientes. Backend a cargo de Claude Code.
 
 El usuario autorizó avanzar el frontend sin esperar más pruebas de magic links. No marcar esas pruebas como aprobadas ni modificar el backend para desbloquearlas.
+
+Fotos implementadas en frontend: pestaña Foto (cámara/galería, JPEG 1024 px/0,8, analizar y editar), Foto rápida con cola local por usuario y reintento al abrir, y banner de pendientes con `process_pending({limit:5})` y progreso por filas procesadas. Falta comprobar estos recorridos en Expo Go/Supabase y medir el límite de 3 s. Ver README para alcance y pruebas. Reconstrucción por días sigue pendiente.
 
 ## Stack y setup
 - Expo SDK actual, TypeScript, `expo-router`, `@supabase/supabase-js`, `expo-camera`, `expo-image-manipulator`, `expo-notifications`, `expo-av` (voz, después).
