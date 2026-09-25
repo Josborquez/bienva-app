@@ -214,11 +214,11 @@ async function identifyItems(req: AnalyzeRequest): Promise<{ items: GeminiItem[]
 async function matchWithFoods(db: any, items: GeminiItem[]): Promise<ResultItem[]> {
   const out: ResultItem[] = [];
   for (const it of items) {
-    const { data } = await db.rpc("search_foods", { q: it.nombre, lim: 1 });
+    // match_food exige similitud >= 0,5. search_foods (filtro 0,3) cruzaba
+    // "agua" con "Atún en agua" y "sopa crema" con "Queso crema".
+    const { data } = await db.rpc("match_food", { q: it.nombre });
     const f = data?.[0];
 
-    // Umbral: aceptamos el match solo si el nombre es razonablemente parecido.
-    // search_foods ya filtra por similitud (% operator), así que si vino, sirve.
     if (f) {
       // Escala por gramos si ambos lados los conocen; si no, por cantidad.
       let factor = it.cantidad || 1;
