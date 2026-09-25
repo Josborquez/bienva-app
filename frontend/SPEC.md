@@ -154,6 +154,17 @@ Construir en este orden. Cada pantalla se prueba en Expo Go antes de pasar a la 
 
 **Tablas** (todas con RLS por `auth.uid()`): `users`, `foods` (solo lectura), `meals`, `meal_items`, `pending_photos`, `user_memory`, `messages`. **Vistas:** `daily_totals`, `frequent_items`. **RPC:** `search_foods(q, lim)`.
 
+**RPC `suggest_target_weight(p_altura_cm, p_peso_kg, p_objetivo)`** — solo `authenticated`. Sugiere el peso objetivo del onboarding.
+```json
+// response: una fila
+{ "peso_min_saludable": number, "peso_max_saludable": number, "peso_sugerido": number, "nota": string | null }
+// errores: 22004 si falta un parámetro
+```
+- Rango saludable = IMC 18,5–24,9, redondeado a 0,5 kg hacia adentro del rango (mín. hacia arriba, máx. hacia abajo). Ej.: 175 cm → 57,0–76,0; 160 cm → 47,5–63,5.
+- `bajar`: sobre el máximo → el máximo; dentro del rango → `max(actual − 3, mínimo)`; bajo el mínimo → el actual y `nota` = "Ya estás bajo el rango saludable; te sugerimos mantener".
+- `mantener`: el actual. `subir`: bajo el mínimo → el mínimo; si no → `min(actual + 3, máximo)`.
+- `complete_onboarding` rechaza `p_peso_objetivo_kg` bajo `peso_min_saludable` con error 22003 "peso objetivo bajo el rango saludable".
+
 **Storage:** bucket privado `meal-photos`, ruta `<user_id>/<uuid>.jpg`. Subir con `contentType: 'image/jpeg'`.
 
 ## 6. Reglas de UX (no negociables)
