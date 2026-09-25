@@ -5,3 +5,7 @@
 !.env.example
 node_modules/
 .DS_Store
+
+# Fotos personales de prueba y grafos generados por /graphify
+fotos-test/
+graphify-out/
