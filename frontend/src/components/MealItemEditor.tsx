@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { TrashIcon } from './TrashIcon';
 import type { EditableItem } from '../types/mealDraft';
 import { es } from '../i18n/es';
 import { theme } from '../theme';
@@ -14,9 +14,7 @@ export function MealItemEditor({ item, onChange, onRemove, disabled }: Props) {
       <View style={styles.actions}>
         <Text style={styles.chip}>{item.fuente === 'base' ? es.register.base : item.fuente === 'frecuente' ? es.foods.frequentSource : es.register.estimated}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={es.register.remove(item.nombre)} accessibilityState={{ disabled }} disabled={disabled} hitSlop={8} onPress={onRemove} style={({ pressed }) => [styles.remove, pressed && styles.removePressed]}>
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.colors.muted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <Path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
-          </Svg>
+          <TrashIcon />
         </Pressable>
       </View>
     </View>

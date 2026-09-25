@@ -2,6 +2,7 @@ import { getSupabase } from './supabase';
 import type { MealDraft } from '../types/mealDraft';
 import { parseAmount, validDay } from '../utils/nutrition';
 import { writeMealRecords } from './mealWriter';
+import { writeLocalDraft } from './localDrafts';
 
 export async function getProfile(userId: string) {
   const { data, error } = await getSupabase().from('users').select('*').eq('id', userId).single();
@@ -17,6 +18,14 @@ export async function getRemoteDrafts(userId: string) {
   const { data, error } = await getSupabase().from('meals').select('id, fecha, tipo, nota').eq('user_id', userId).eq('es_borrador', true).order('created_at', { ascending: false });
   if (error) throw error;
   return data;
+}
+// Only drafts: es_borrador guards against ever deleting a saved meal. meal_items
+// go with it (on delete cascade). Remote first, so a failure keeps the local copy
+// and the user can retry; a draft that never synced simply matches no row.
+export async function deleteMealDraft(userId: string, id: string) {
+  const { error } = await getSupabase().from('meals').delete().eq('id', id).eq('user_id', userId).eq('es_borrador', true);
+  if (error) throw error;
+  await writeLocalDraft(userId, null, id);
 }
 export async function loadMealDraft(userId: string, id: string): Promise<MealDraft | null> {
   const { data, error } = await getSupabase().from('meals').select('*, meal_items(*)').eq('id', id).eq('user_id', userId).maybeSingle();

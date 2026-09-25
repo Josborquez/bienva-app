@@ -5,7 +5,9 @@ import { randomUUID } from 'expo-crypto';
 import { Screen } from '../../src/components/Screen';
 import { Button } from '../../src/components/Button';
 import { NutrientCard } from '../../src/components/NutrientCard';
+import { DraftRow } from '../../src/components/DraftRow';
 import { signOut } from '../../src/api/auth';
+import { deleteMealDraft } from '../../src/api/meals';
 import { useSession } from '../../src/hooks/useSession';
 import { useToday } from '../../src/hooks/useToday';
 import { mealTypes, sumNutrition } from '../../src/utils/nutrition';
@@ -71,7 +73,7 @@ export default function Today() {
         </>}
       </>}
     {(today.localDrafts.isError || today.remoteDrafts.isError) && <Text accessibilityRole="alert" style={styles.notice}>{es.today.draftsError}</Text>}
-    {drafts.size > 0 && <View style={styles.drafts}><Text style={styles.section}>{es.today.drafts}</Text><Text style={styles.muted}>{es.today.draftHint}</Text>{Array.from(drafts.values()).map(draft => <Button secondary key={draft.id} title={`${es.today.resume} · ${es.mealTypes[draft.tipo]} · ${draft.fecha}`} onPress={() => openDraft(draft.id)} />)}</View>}
+    {drafts.size > 0 && <View style={styles.drafts}><Text style={styles.section}>{es.today.drafts}</Text><Text style={styles.muted}>{es.today.draftHint}</Text>{Array.from(drafts.values()).map(draft => <DraftRow key={draft.id} label={`${es.today.resume} · ${es.mealTypes[draft.tipo]} · ${draft.fecha}`} onOpen={() => openDraft(draft.id)} onDelete={async () => { await deleteMealDraft(session.user.id, draft.id); today.refresh(); }} />)}</View>}
   </Screen>;
 }
 const styles = StyleSheet.create({
