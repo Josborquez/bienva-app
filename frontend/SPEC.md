@@ -143,14 +143,28 @@ Construir en este orden. Cada pantalla se prueba en Expo Go antes de pasar a la 
 
 ## 5. Contratos con el backend
 
-**Edge Function `analyze`** — `POST {SUPABASE_URL}/functions/v1/analyze`, header `Authorization: Bearer <access_token>`.
+**Edge Function `analyze`** — `POST {SUPABASE_URL}/functions/v1/analyze`, header `Authorization: Bearer <access_token>`. Enviar **uno** de `text`, `image_base64` o `photo_path` (con dos o ninguno → 400). Las fotos (los dos últimos modos) cuentan para el tope diario; el texto no.
 ```json
-// request
-{ "image_base64"?: string, "mime_type"?: "image/jpeg", "text"?: string, "meal_type"?: MealType, "fecha"?: "YYYY-MM-DD" }
+// request: uno de los tres modos
+{ "text": string, "meal_type"?: MealType, "fecha"?: "YYYY-MM-DD" }
+{ "image_base64": string, "mime_type"?: "image/jpeg", "meal_type"?: MealType, "fecha"?: "YYYY-MM-DD" }
+{ "photo_path": "<user_id>/<archivo>.jpg", "meal_type"?: MealType, "fecha"?: "YYYY-MM-DD" }   // foto ya subida a meal-photos
 // response 200
 { "items": MealItemDraft[], "totals": { "kcal": number, "prot_g": number }, "needs_confirmation": boolean, "ms": number }
-// 401 no autenticado · 429 { "error": "limite_fotos" } · 500 { "error": string }
+// 400 pedido inválido · 401 no autenticado · 403 photo_path de otro usuario · 404 photo_path inexistente · 413 foto > 5 MB
+// 429 { "error": "limite_fotos" } · 503 { "error": "ia_no_disponible" } (reintentable) · 500 { "error": string }
 ```
+
+**Edge Function `process_pending`** — `POST {SUPABASE_URL}/functions/v1/process_pending`, mismo header. Procesa las fotos de captura rápida del usuario (`pending_photos` con `procesada = false`, por `tomada_en`) y crea una comida en borrador por foto (`origen = 'foto'`, `es_borrador = true`, `foto_path`), que P5 Reconstruir muestra para revisar.
+```json
+// request (opcional)
+{ "limit"?: number }   // 1–10, por defecto 5
+// response 200
+{ "processed": number, "created_meals": string[], "errors": [{ "id": string, "error": string }], "stopped"?: "limite_fotos" | "ia_no_disponible" }
+// 400 limit inválido · 401 no autenticado · 500 { "error": string }
+```
+- `meal_type` de cada comida = `tipo_sugerido` de la foto, o por hora local de `tomada_en` en America/Santiago (<10 desayuno, 10–15 almuerzo, 15–19 snack, ≥19 cena). `fecha` = día de `tomada_en` en Santiago.
+- Una foto que falla queda `procesada = true` con `error` y se sigue con la siguiente. `stopped: "limite_fotos"` o `"ia_no_disponible"` deja el resto pendiente: se puede volver a llamar más tarde.
 
 **Tablas** (todas con RLS por `auth.uid()`): `users`, `foods` (solo lectura), `meals`, `meal_items`, `pending_photos`, `user_memory`, `messages`. **Vistas:** `daily_totals`, `frequent_items`. **RPC:** `search_foods(q, lim)`.
 

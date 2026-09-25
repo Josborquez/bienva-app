@@ -1,319 +1,60 @@
 // supabase/functions/analyze/index.ts
-// Recibe una foto (base64) o texto, pide a Gemini un JSON estricto con los
-// alimentos y porciones, cruza cada ítem contra la tabla foods y devuelve
-// los ítems listos para confirmar en la app.
-//
-// Si Gemini no está disponible (429/5xx o red), reintenta con Claude Haiku 4.5.
+// Analiza una comida y devuelve los ítems listos para confirmar en la app.
+// Tres modos (uno por pedido):
+//   { text }                         texto libre; no cuenta para el tope de fotos
+//   { image_base64, mime_type? }     foto enviada en el cuerpo
+//   { photo_path }                   foto ya subida a Storage (meal-photos/<user_id>/…)
+// La lógica compartida (modelos, cruce con foods, tope) vive en _shared/analyze.ts.
 //
 // Deploy:  supabase functions deploy analyze
-// Secrets: supabase secrets set GEMINI_API_KEY=...  GEMINI_MODEL=gemini-3.6-flash
-//          supabase secrets set ANTHROPIC_API_KEY=...   (respaldo; opcional)
+// Secrets: GEMINI_API_KEY, GEMINI_MODEL, ANTHROPIC_API_KEY (ver README)
 
-import Anthropic from "npm:@anthropic-ai/sdk@0.128";
-import { createClient } from "npm:@supabase/supabase-js@2";
-
-// ---------------------------------------------------------------------------
-// Tipos
-// ---------------------------------------------------------------------------
-const MEAL_TYPES = ["desayuno", "almuerzo", "snack", "once", "cena"] as const; // = enum meal_type
-type MealType = (typeof MEAL_TYPES)[number];
+import {
+  analyzeMeal, authenticate, canAnalyzePhoto, cors, countPhoto, errorResponse, json,
+  MEAL_TYPES, photoFromStorage, type AnalyzeInput, type MealType,
+} from "../_shared/analyze.ts";
 
 interface AnalyzeRequest {
-  image_base64?: string;      // JPEG/PNG ya redimensionado a ≤1024 px
-  mime_type?: string;         // "image/jpeg" por defecto
-  text?: string;              // "2 huevos revueltos y pan con palta"
+  text?: string;
+  image_base64?: string;
+  mime_type?: string;
+  photo_path?: string;
   meal_type?: MealType;
-  fecha?: string;             // YYYY-MM-DD, por defecto hoy
+  fecha?: string;             // YYYY-MM-DD; lo usa la app, no el contador de fotos
 }
-
-interface GeminiItem {
-  nombre: string;
-  cantidad: number;           // unidades o multiplicador ("2 huevos" → 2)
-  cantidad_g: number | null;  // gramos estimados de la porción total
-  kcal: number;
-  prot_g: number;
-  confianza: number;          // 0–1
-}
-
-interface ResultItem extends GeminiItem {
-  food_id: string | null;
-  match_nombre: string | null;
-  fuente: "base" | "modelo";  // de dónde salieron los números finales
-}
-
-// ---------------------------------------------------------------------------
-// Prompt
-// ---------------------------------------------------------------------------
-const SYSTEM_PROMPT = `Eres un nutricionista chileno experto en estimar porciones.
-Analiza la comida y devuelve SOLO JSON con este esquema exacto:
-{"items":[{"nombre":string,"cantidad":number,"cantidad_g":number|null,"kcal":number,"prot_g":number,"confianza":number}]}
-
-Reglas:
-- Usa nombres chilenos y genéricos: "marraqueta", "palta", "completo", "sopaipilla", "pan de molde integral". Si ves una marca clara (Soprole, Colun, Carozzi, McKay), inclúyela en el nombre.
-- Una fila por alimento distinto. "Pan con palta" son dos filas: pan y palta.
-- cantidad: unidades cuando aplica (2 huevos → 2, 1 lata → 1); si es a granel usa 1 y pon los gramos en cantidad_g.
-- kcal y prot_g son para la cantidad TOTAL indicada, no por 100 g.
-- confianza: 0.9 si es evidente; 0.6 si la porción es dudosa; 0.3 si apenas se distingue.
-- Si no hay comida en la imagen o texto, devuelve {"items":[]}.
-- No agregues texto fuera del JSON.`;
-
-const RESPONSE_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    items: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          nombre:     { type: "STRING" },
-          cantidad:   { type: "NUMBER" },
-          cantidad_g: { type: "NUMBER", nullable: true },
-          kcal:       { type: "NUMBER" },
-          prot_g:     { type: "NUMBER" },
-          confianza:  { type: "NUMBER" },
-        },
-        required: ["nombre", "cantidad", "cantidad_g", "kcal", "prot_g", "confianza"],
-      },
-    },
-  },
-  required: ["items"],
-};
-
-// ---------------------------------------------------------------------------
-// Gemini
-// ---------------------------------------------------------------------------
-async function callGemini(req: AnalyzeRequest): Promise<GeminiItem[]> {
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
-  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
-  if (!apiKey) throw new Error("GEMINI_API_KEY no configurada");
-
-  const parts: unknown[] = [];
-  if (req.image_base64) {
-    parts.push({ inlineData: { mimeType: req.mime_type ?? "image/jpeg", data: req.image_base64 } });
-  }
-  parts.push({
-    text: req.text
-      ? `Comida descrita por el usuario (${req.meal_type ?? "sin tipo"}): ${req.text}`
-      : `Foto de ${req.meal_type ?? "una comida"}. Identifica todo lo que se ve.`,
-  });
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const body = {
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: [{ role: "user", parts }],
-    generationConfig: {
-      temperature: 0.2,
-      responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA,
-    },
-  };
-
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    throw new ModelUnavailableError(`Gemini red: ${e}`);
-  }
-  if (res.status === 429 || res.status >= 500) {
-    throw new ModelUnavailableError(`Gemini ${res.status}: ${await res.text()}`);
-  }
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-
-  const data = await res.json();
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed.items) ? parsed.items : [];
-}
-
-// Gemini caído o saturado: vale la pena probar otro modelo.
-class ModelUnavailableError extends Error {}
-
-// ---------------------------------------------------------------------------
-// Respaldo: Claude Haiku 4.5 (mismo prompt, mismo esquema)
-// ---------------------------------------------------------------------------
-const HAIKU_SCHEMA = {
-  type: "object",
-  properties: {
-    items: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          nombre:     { type: "string" },
-          cantidad:   { type: "number" },
-          cantidad_g: { anyOf: [{ type: "number" }, { type: "null" }] },
-          kcal:       { type: "number" },
-          prot_g:     { type: "number" },
-          confianza:  { type: "number" },
-        },
-        required: ["nombre", "cantidad", "cantidad_g", "kcal", "prot_g", "confianza"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["items"],
-  additionalProperties: false,
-};
-
-type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-
-async function callHaiku(req: AnalyzeRequest): Promise<GeminiItem[]> {
-  const client = new Anthropic({ timeout: 60_000 }); // lee ANTHROPIC_API_KEY
-
-  const content: Anthropic.ContentBlockParam[] = [];
-  if (req.image_base64) {
-    content.push({
-      type: "image",
-      source: { type: "base64", media_type: (req.mime_type ?? "image/jpeg") as ImageMediaType, data: req.image_base64 },
-    });
-  }
-  content.push({
-    type: "text",
-    text: req.text
-      ? `Comida descrita por el usuario (${req.meal_type ?? "sin tipo"}): ${req.text}`
-      : `Foto de ${req.meal_type ?? "una comida"}. Identifica todo lo que se ve.`,
-  });
-
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5",
-    max_tokens: 16000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content }],
-    output_config: { format: { type: "json_schema", schema: HAIKU_SCHEMA } },
-  });
-  if (msg.stop_reason !== "end_turn") throw new Error(`Haiku stop_reason: ${msg.stop_reason}`);
-
-  const block = msg.content.find((b) => b.type === "text");
-  const parsed = JSON.parse(block?.type === "text" ? block.text : "{}");
-  return Array.isArray(parsed.items) ? parsed.items : [];
-}
-
-// Gemini primero; si no está disponible y hay clave de Anthropic, Haiku.
-// TEMPORAL (24 sep 2026): Gemini desactivado mientras su cuota está agotada
-// (429 "exceeded your current quota"); todo va directo a Haiku. Para volver,
-// descomentar el bloque y borrar el return de abajo.
-async function identifyItems(req: AnalyzeRequest): Promise<{ items: GeminiItem[]; modelo: string }> {
-  // try {
-  //   return { items: await callGemini(req), modelo: "gemini" };
-  // } catch (e) {
-  //   if (!(e instanceof ModelUnavailableError) || !Deno.env.get("ANTHROPIC_API_KEY")) throw e;
-  //   console.warn(`Gemini no disponible, uso Haiku: ${e.message.slice(0, 200)}`);
-  //   return { items: await callHaiku(req), modelo: "haiku" };
-  // }
-  return { items: await callHaiku(req), modelo: "haiku" };
-}
-
-// ---------------------------------------------------------------------------
-// Cruce con la base chilena
-// ---------------------------------------------------------------------------
-// deno-lint-ignore no-explicit-any
-async function matchWithFoods(db: any, items: GeminiItem[]): Promise<ResultItem[]> {
-  const out: ResultItem[] = [];
-  for (const it of items) {
-    // match_food exige similitud >= 0,5. search_foods (filtro 0,3) cruzaba
-    // "agua" con "Atún en agua" y "sopa crema" con "Queso crema".
-    const { data } = await db.rpc("match_food", { q: it.nombre });
-    const f = data?.[0];
-
-    if (f) {
-      // Escala por gramos si ambos lados los conocen; si no, por cantidad.
-      let factor = it.cantidad || 1;
-      if (it.cantidad_g && f.porcion_g) factor = it.cantidad_g / Number(f.porcion_g);
-      out.push({
-        ...it,
-        nombre: f.marca ? `${f.nombre} ${f.marca}` : f.nombre,
-        kcal: Math.round(Number(f.kcal) * factor),
-        prot_g: Math.round(Number(f.prot_g) * factor),
-        food_id: f.id,
-        match_nombre: f.nombre,
-        fuente: "base",
-        confianza: Math.max(it.confianza, f.verificado ? 0.8 : it.confianza),
-      });
-    } else {
-      out.push({ ...it, kcal: Math.round(it.kcal), prot_g: Math.round(it.prot_g), food_id: null, match_nombre: null, fuente: "modelo" });
-    }
-  }
-  return out;
-}
-
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
-    // 1. Usuario autenticado (JWT de la app)
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: { user }, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !user) return json({ error: "No autenticado" }, 401);
-
-    // 2. Cliente con service_role para contadores y búsqueda
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const auth = await authenticate(req);
+    if (!auth) return json({ error: "No autenticado" }, 401);
+    const { user, userClient, admin } = auth;
 
     const body = (await req.json()) as AnalyzeRequest;
-    if (!body.image_base64 && !body.text) return json({ error: "Falta image_base64 o text" }, 400);
+    const modes = [body.text, body.image_base64, body.photo_path].filter(Boolean).length;
+    if (modes === 0) return json({ error: "Falta text, image_base64 o photo_path" }, 400);
+    if (modes > 1) return json({ error: "Envía solo uno: text, image_base64 o photo_path" }, 400);
     if (body.meal_type && !MEAL_TYPES.includes(body.meal_type)) {
       return json({ error: `meal_type inválido; usa ${MEAL_TYPES.join(", ")}` }, 400);
     }
 
-    // 3. Tope del plan free (solo para fotos; el texto es gratis)
-    if (body.image_base64) {
-      const { data: ok } = await admin.rpc("can_analyze_photo", { p_user: user.id });
-      if (!ok) return json({ error: "limite_fotos", message: "Llegaste al tope de fotos de hoy" }, 429);
+    // Tope del plan free: solo para fotos (el texto es gratis).
+    const isPhoto = Boolean(body.image_base64 || body.photo_path);
+    if (isPhoto && !(await canAnalyzePhoto(admin, user.id))) {
+      return json({ error: "limite_fotos", message: "Llegaste al tope de fotos de hoy" }, 429);
     }
 
-    // 4. Gemini (o Haiku de respaldo) → ítems
+    const input: AnalyzeInput = { text: body.text, image_base64: body.image_base64, mime_type: body.mime_type, meal_type: body.meal_type };
+    if (body.photo_path) Object.assign(input, await photoFromStorage(userClient, user.id, body.photo_path));
+
     const t0 = Date.now();
-    const { items: raw, modelo } = await identifyItems(body);
-    console.log(`analyze modelo=${modelo} items=${raw.length}`);
+    const { modelo, ...result } = await analyzeMeal(admin, input);
+    console.log(`analyze modelo=${modelo} items=${result.items.length} modo=${body.photo_path ? "photo_path" : body.image_base64 ? "image_base64" : "text"}`);
 
-    // 5. Cruce con foods
-    const items = await matchWithFoods(admin, raw);
-
-    // 6. Contador de uso: siempre la fecha del servidor (UTC, igual que el
-    // current_date de can_analyze_photo). body.fecha es del cliente; si se
-    // usara aquí, una foto "de ayer" no sumaría al tope de hoy.
-    const hoy = new Date().toISOString().slice(0, 10);
-    if (body.image_base64) {
-      await admin.rpc("increment_ai_usage", { p_user: user.id, p_fecha: hoy, p_fotos: 1, p_mensajes: 0 });
-    }
-
-    return json({
-      items,
-      totals: {
-        kcal: items.reduce((a, i) => a + i.kcal, 0),
-        prot_g: items.reduce((a, i) => a + i.prot_g, 0),
-      },
-      needs_confirmation: items.some((i) => i.confianza < 0.6),
-      ms: Date.now() - t0,
-    });
+    if (isPhoto) await countPhoto(admin, user.id);
+    return json({ ...result, ms: Date.now() - t0 });
   } catch (e) {
-    console.error(e);
-    if (e instanceof ModelUnavailableError) {
-      return json({ error: "ia_no_disponible", message: "La IA está saturada, intenta en un rato" }, 503);
-    }
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    return errorResponse(e);
   }
 });
-
-function json(payload: unknown, status = 200) {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
-}

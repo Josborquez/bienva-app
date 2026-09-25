@@ -61,9 +61,9 @@ npx deno run --allow-net=www.jumbo.cl,www.santaisabel.cl tools/etiquetas.ts busc
 `tools/etiquetas.ts` respeta robots.txt (Líder prohíbe fichas y Unimarc bloquea bots: no se usan), va de a una petición cada 2 s y se identifica como `BienvaEtiquetas`. El SQL que imprime se revisa (nombre, categoría, aliases, que no le gane búsquedas genéricas) antes de copiarlo a una migración.
 
 ## Backlog inmediato (en orden)
-1. Desplegar y probar `analyze` con texto y con foto. Ajustar el prompt si Gemini devuelve nombres no chilenos.
-2. Edge Function `coach`: POST `{ message }` → arma prompt (perfil + día + últimos 20) → Haiku → guarda en `messages` → dispara `update_memory` (segunda llamada que reescribe `user_memory.perfil_texto`).
-3. Edge Function `process_pending`: toma `pending_photos` no procesadas del usuario, las manda a `analyze` en lote, crea `meals` en borrador.
+1. ~~Desplegar y probar `analyze` con texto y con foto.~~ Hecho (25 sep 2026): modos `text`, `image_base64` y `photo_path`, probados en producción. Pendiente: volver a Gemini cuando tenga cuota.
+2. Edge Function `coach`: POST `{ message }` → arma prompt (perfil + día + últimos 20) → Haiku → guarda en `messages` → dispara `update_memory` (segunda llamada que reescribe `user_memory.perfil_texto`). Reglas de guías alimentarias listas en `_shared/guias_alimentarias.ts`.
+3. ~~Edge Function `process_pending`.~~ Hecho (25 sep 2026): comparte lógica con `analyze` en `_shared/analyze.ts`; ver `functions/analyze/README.md`.
 4. Cron (pg_cron o Supabase Scheduled Functions): sábado 20:00 America/Santiago, resumen semanal → push.
 5. Endpoint `foods/suggest`: ítems con `fuente: "modelo"` que se repiten → candidatos a agregar a `foods`.
 
