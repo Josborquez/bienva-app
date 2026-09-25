@@ -3,11 +3,11 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 
-export function Screen({ children }: PropsWithChildren) {
+export function Screen({ children, top = false }: PropsWithChildren<{ top?: boolean }>) {
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.content, top && { justifyContent: 'flex-start', maxWidth: 720 }]} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
       </KeyboardAvoidingView>

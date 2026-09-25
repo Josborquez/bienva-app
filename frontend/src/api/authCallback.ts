@@ -12,5 +12,14 @@ export function parseAuthCallback(incoming: string, expectedRedirect: string): C
   const access_token = params.get('access_token');
   const refresh_token = params.get('refresh_token');
   if (access_token && refresh_token) return { access_token, refresh_token };
+  if (!params.has('access_token') && !params.has('refresh_token') && !params.has('code')) return null;
   throw new Error('Missing callback credentials');
+}
+
+export function authCallbackTarget(incoming: string, expectedRedirect: string): '/' | '/auth/password' {
+  const url = new URL(incoming), expected = new URL(expectedRedirect);
+  if (url.protocol !== expected.protocol || url.host !== expected.host || url.pathname !== expected.pathname) return '/';
+  const params = new URLSearchParams(url.search);
+  new URLSearchParams(url.hash.slice(1)).forEach((value, key) => params.set(key, value));
+  return params.get('type') === 'recovery' || params.get('recovery') === '1' ? '/auth/password' : '/';
 }

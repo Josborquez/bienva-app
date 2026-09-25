@@ -1,19 +1,22 @@
 import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import type { Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
-import { completeAuthCallback } from '../api/auth';
+import { completeAuthCallback, getAuthRedirectUrl } from '../api/auth';
+import { authCallbackTarget } from '../api/authCallback';
 import { getSupabase, isSupabaseConfigured } from '../api/supabase';
 import { es } from '../i18n/es';
 
-type AuthState = { session: Session | null; loading: boolean; callbackLoading: boolean; error: string | null };
+type AuthState = { session: Session | null; loading: boolean; callbackLoading: boolean; callbackProcessed: boolean; callbackTarget: '/' | '/auth/password'; error: string | null };
 const SessionContext = createContext<AuthState | null>(null);
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [callbackLoading, setCallbackLoading] = useState(false);
+  const [processedUrl, setProcessedUrl] = useState<string | null>(null);
+  const [callbackTarget, setCallbackTarget] = useState<'/' | '/auth/password'>('/');
   const [error, setError] = useState<string | null>(null);
   const url = Linking.useURL();
   const queryClient = useQueryClient();
@@ -44,13 +47,17 @@ export function SessionProvider({ children }: PropsWithChildren) {
       if (state === 'active') client.auth.startAutoRefresh();
       else client.auth.stopAutoRefresh();
     };
-    updateRefresh(AppState.currentState);
-    const listener = AppState.addEventListener('change', updateRefresh);
+    // Supabase manages visibility and recovery itself in browsers. Calling
+    // start/stopAutoRefresh there removes its built-in visibility listener.
+    const listener = Platform.OS !== 'web'
+      ? AppState.addEventListener('change', updateRefresh)
+      : undefined;
+    if (Platform.OS !== 'web') updateRefresh(AppState.currentState);
     return () => {
       active = false;
-      listener.remove();
+      listener?.remove();
       subscription.unsubscribe();
-      client.auth.stopAutoRefresh();
+      if (Platform.OS !== 'web') client.auth.stopAutoRefresh();
     };
   }, [queryClient]);
 
@@ -59,15 +66,17 @@ export function SessionProvider({ children }: PropsWithChildren) {
     let active = true;
     setCallbackLoading(true);
     setError(null);
-    completeAuthCallback(url).catch(() => {
+    completeAuthCallback(url).then(() => {
+      if (active) setCallbackTarget(authCallbackTarget(url, getAuthRedirectUrl()));
+    }).catch(() => {
       if (active) setError(es.auth.callbackError);
     }).finally(() => {
-      if (active) setCallbackLoading(false);
+      if (active) { setProcessedUrl(url); setCallbackLoading(false); }
     });
     return () => { active = false; };
   }, [url]);
 
-  return <SessionContext.Provider value={{ session, loading, callbackLoading, error }}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={{ session, loading, callbackLoading: callbackLoading || Boolean(url && url !== processedUrl), callbackProcessed: Boolean(processedUrl && processedUrl === url), callbackTarget, error }}>{children}</SessionContext.Provider>;
 }
 
 export function useSession() {

@@ -1,8 +1,7 @@
 import 'react-native-url-polyfill/auto';
-import { createClient, processLock, type SupabaseClient } from '@supabase/supabase-js';
-import * as SecureStore from 'expo-secure-store';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
-import { createSecureSessionStorage } from './secureSessionStorage';
+import { sessionStorage } from './sessionStorage';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -13,12 +12,11 @@ export function getSupabase() {
   if (!url || !key) throw new Error('Missing Supabase environment configuration');
   client ??= createClient<Database>(url, key, {
     auth: {
-      storage: createSecureSessionStorage(SecureStore),
+      storage: sessionStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
       flowType: 'implicit',
-      lock: processLock,
     },
   });
   return client;

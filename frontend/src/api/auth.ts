@@ -1,9 +1,14 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import { getSupabase } from './supabase';
 import { parseAuthCallback } from './authCallback';
+import { createPasswordAuth } from './passwordAuth';
+
+export function passwordAuth() { return createPasswordAuth(getSupabase(), getAuthRedirectUrl()); }
 
 export function getAuthRedirectUrl() {
+  if (Platform.OS === 'web') return new URL('/auth/callback', window.location.origin).href;
   return Constants.executionEnvironment === ExecutionEnvironment.StoreClient
     ? Linking.createURL('auth/callback')
     : 'bienva://auth/callback';
@@ -31,6 +36,12 @@ export async function completeAuthCallback(url: string): Promise<boolean> {
       : await getSupabase().auth.setSession(credentials);
     if (error) throw error;
     lastCompletedUrl = url;
+    if (Platform.OS === 'web') {
+      // Keep recovery intent across a reload, but remove credentials from the URL.
+      const incoming = new URL(url);
+      const recovery = new URLSearchParams(incoming.hash.slice(1)).get('type') === 'recovery' || incoming.searchParams.get('type') === 'recovery';
+      if (window.location.pathname === '/auth/callback') window.history.replaceState(window.history.state, '', recovery ? '/auth/callback?recovery=1' : '/auth/callback');
+    }
     return true;
   })();
   inFlight = { url, promise };

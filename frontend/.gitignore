@@ -1,5 +1,6 @@
 node_modules/
 .expo/
+.vercel/
 dist/
 coverage/
 .env
@@ -11,3 +12,6 @@ coverage/
 /ios/
 /android/
 .kilo/
+
+.vercel
+.env*

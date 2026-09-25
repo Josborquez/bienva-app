@@ -8,9 +8,9 @@ import { es } from '../../src/i18n/es';
 import { theme } from '../../src/theme';
 
 export default function AuthCallbackScreen() {
-  const { session, loading, callbackLoading, error } = useSession();
+  const { session, loading, callbackLoading, callbackProcessed, callbackTarget, error } = useSession();
   const router = useRouter();
-  if (loading || callbackLoading) return <LoadingScreen />;
-  if (session) return <Redirect href="/" />;
+  if (loading || callbackLoading || !callbackProcessed) return <LoadingScreen />;
+  if (session && !error) return <Redirect href={callbackTarget} />;
   return <Screen><Text accessibilityRole="alert" style={{ color: theme.colors.text, fontSize: 17 }}>{error || es.auth.callbackError}</Text><Button title={es.auth.back} onPress={() => router.replace('/(auth)/login')} /></Screen>;
 }

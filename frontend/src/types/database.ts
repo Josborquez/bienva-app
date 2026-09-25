@@ -1,3 +1,5 @@
+import type { ProfileFields, TargetArgs, CompleteArgs, Targets, WeightSuggestion, WeightSuggestionArgs } from './onboarding';
+
 export type Json =
   | string
   | number
@@ -362,7 +364,7 @@ export type Database = {
         ]
       }
       users: {
-        Row: {
+        Row: ProfileFields & {
           created_at: string
           email: string | null
           fotos_gratis_por_dia: number
@@ -378,7 +380,7 @@ export type Database = {
           timezone: string
           updated_at: string
         }
-        Insert: {
+        Insert: Partial<ProfileFields> & {
           created_at?: string
           email?: string | null
           fotos_gratis_por_dia?: number
@@ -394,7 +396,7 @@ export type Database = {
           timezone?: string
           updated_at?: string
         }
-        Update: {
+        Update: Partial<ProfileFields> & {
           created_at?: string
           email?: string | null
           fotos_gratis_por_dia?: number
@@ -503,6 +505,9 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      compute_targets: { Args: TargetArgs; Returns: Targets[] }
+      suggest_target_weight: { Args: WeightSuggestionArgs; Returns: WeightSuggestion[] }
+      complete_onboarding: { Args: CompleteArgs; Returns: Database['public']['Tables']['users']['Row'] }
     }
     Enums: {
       chat_role: "user" | "assistant"
